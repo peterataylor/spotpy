@@ -152,6 +152,12 @@ class sceua(_algorithm):
 
             return igs, likes, pars, sims, cx, cf, k1, k2
 
+    def progress_update(self, proportion_completion, msg):
+        if hasattr(self, 'progress_update_callback'):
+            self.progress_update_callback(proportion_completion, msg)
+        else:
+            print(msg)
+
     def sample(self, repetitions, ngs=20, kstop=100, pcento=0.0000001, peps=0.0000001):
         """
         Samples from parameter distributions using SCE-UA (Duan, 2004), 
@@ -171,7 +177,7 @@ class sceua(_algorithm):
         peps: float
             Value of the normalized geometric range of the parameters in the population below which convergence is deemed achieved.
         """
-        print('Starting the SCE-UA algorithm with '+str(repetitions)+ ' repetitions...')
+        self.progress_update(0.0, 'Starting the SCE-UA algorithm with '+str(repetitions)+ ' repetitions...')
         self.set_repetiton(repetitions)
         # Initialize the Progress bar
         starttime = time.time()
@@ -206,7 +212,7 @@ class sceua(_algorithm):
             icall = 0
             xf = np.zeros(npt)
 
-            print ('burn-in sampling started...')
+            self.progress_update(0.0, 'burn-in sampling started...')
 
             # Burn in
             param_generator = ((rep, x[rep]) for rep in range(int(npt)))
@@ -253,18 +259,18 @@ class sceua(_algorithm):
 
         # Check for convergency;
         if icall >= repetitions:
-            print('*** OPTIMIZATION SEARCH TERMINATED BECAUSE THE LIMIT')
-            print('ON THE MAXIMUM NUMBER OF TRIALS ')
-            print(repetitions)
-            print('HAS BEEN EXCEEDED.  SEARCH WAS STOPPED AT TRIAL NUMBER:')
-            print(icall)
-            print('OF THE INITIAL LOOP!')
+            self.progress_update(1.0, '*** OPTIMIZATION SEARCH TERMINATED BECAUSE THE LIMIT')
+            self.progress_update(1.0, 'ON THE MAXIMUM NUMBER OF TRIALS ')
+            self.progress_update(1.0, repetitions)
+            self.progress_update(1.0, 'HAS BEEN EXCEEDED.  SEARCH WAS STOPPED AT TRIAL NUMBER:')
+            self.progress_update(1.0, icall)
+            self.progress_update(1.0, 'OF THE INITIAL LOOP!')
 
         if gnrng < peps:
-            print(
+            self.progress_update(1.0, 
                 'THE POPULATION HAS CONVERGED TO A PRESPECIFIED SMALL PARAMETER SPACE')
 
-        print ('burn-in sampling completed...')
+        self.progress_update(0.01 ,'burn-in sampling completed...')
 
         # Begin evolution loops:
         nloop = 0
@@ -276,11 +282,11 @@ class sceua(_algorithm):
         #acttime = time.time()
         self.repeat.setphase('ComplexEvo')
 
-        print ('ComplexEvo started...')
+        self.progress_update(0.01, 'ComplexEvo started...')
 
         while icall < repetitions and gnrng > peps and criter_change_pcent > pcento:
             nloop += 1
-            print ('ComplexEvo loop #%d in progress...' % nloop)
+            self.progress_update(icall / repetitions, 'ComplexEvo loop #%d in progress...' % nloop)
             # print nloop
             # print 'Start MPI'
             # Loop on complexes (sub-populations);
@@ -339,19 +345,18 @@ class sceua(_algorithm):
 
             # Check for convergency;
             if icall >= repetitions:
-                print('*** OPTIMIZATION SEARCH TERMINATED BECAUSE THE LIMIT')
-                print('ON THE MAXIMUM NUMBER OF TRIALS ')
-                print(repetitions)
-                print('HAS BEEN EXCEEDED.')
-
+                self.progress_update(1.0, '*** OPTIMIZATION SEARCH TERMINATED BECAUSE THE LIMIT')
+                self.progress_update(1.0, 'ON THE MAXIMUM NUMBER OF TRIALS ')
+                self.progress_update(1.0, repetitions)
+                self.progress_update(1.0, 'HAS BEEN EXCEEDED.')
             if gnrng < peps:
-                print(
+                self.progress_update(1.0, 
                     'THE POPULATION HAS CONVERGED TO A PRESPECIFIED SMALL PARAMETER SPACE')
 
             criter = np.append(criter, bestf)
 
             if nloop >= kstop:  # necessary so that the area of high posterior density is visited as much as possible
-                print ('objective function convergence criteria is now being updated and assessed...')
+                self.progress_update(icall / repetitions , 'objective function convergence criteria is now being updated and assessed...')
                 absolute_change = np.abs(
                     criter[nloop - 1] - criter[nloop - kstop])
                 denominator = np.mean(np.abs(criter[(nloop - kstop):nloop]))
@@ -359,21 +364,21 @@ class sceua(_algorithm):
                     criter_change_pcent = 0.0
                 else:
                     criter_change_pcent = absolute_change / denominator * 100
-                print ('updated convergence criteria: %f' % criter_change_pcent)
+                self.progress_update(icall / repetitions, 'updated convergence criteria: %f' % criter_change_pcent)
                 if criter_change_pcent < pcento:
                     text = 'THE BEST POINT HAS IMPROVED IN LAST %d LOOPS BY LESS THAN THE USER-SPECIFIED THRESHOLD %f' % (
                         kstop, pcento)
-                    print(text)
-                    print(
+                    self.progress_update(icall / repetitions, text)
+                    self.progress_update(1.0,
                         'CONVERGENCY HAS ACHIEVED BASED ON OBJECTIVE FUNCTION CRITERIA!!!')
         # End of the Outer Loops
         text = 'SEARCH WAS STOPPED AT TRIAL NUMBER: %d' % icall
-        print(text)
+        self.progress_update(1.0, text)
         text = 'NORMALIZED GEOMETRIC RANGE = %f' % gnrng
-        print(text)
+        self.progress_update(1.0, text)
         text = 'THE BEST POINT HAS IMPROVED IN LAST %d LOOPS BY %f PERCENT' % (
             kstop, criter_change_pcent)
-        print(text)
+        self.progress_update(1.0, text)
 
         # reshape BESTX
         BESTX = BESTX.reshape(BESTX.size // self.nopt, self.nopt)
